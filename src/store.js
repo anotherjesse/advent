@@ -13,6 +13,14 @@ const validateName = (name) => {
   return name;
 }
 
+// version ids will be in the hostname
+const createVersionId = () => {
+  let rand = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+  let ts = Date.now() % 100000;
+  return `${ts}-${rand}`;
+}
+
+
 
 class ProjectStore {
   constructor(db, r2Bucket) {
@@ -31,7 +39,7 @@ class ProjectStore {
       throw new Error(`A project named '${name}' already exists`);
     }
 
-    const newVersionId = crypto.randomUUID();
+    const newVersionId = createVersionId();
     await this.db.prepare(
       "INSERT INTO projects (name, live_version_id) VALUES (?, ?)"
     ).bind(name, newVersionId).run();
@@ -129,7 +137,7 @@ class ProjectStore {
       }
     }
 
-    const newVersionId = crypto.randomUUID();
+    const newVersionId = createVersionId();
 
     await this.db.prepare(
       "INSERT INTO versions (id, project_name, parent_version_id, pages) VALUES (?, ?, ?, ?)"

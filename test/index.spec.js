@@ -7,20 +7,21 @@ import worker from '../src';
 describe('worker', () => {
 
 	it('creating empty project', async () => {
-		let response = await SELF.fetch("http://api.example.com/v0/projects")
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects")
 		expect(await response.json()).toEqual([]);
 
 		let project = { name: "empty" }
 
-		response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(project) })
+		response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(project) })
 		expect(response.status).toBe(200);
-		response = await SELF.fetch("http://api.example.com/v0/projects")
+		response = await SELF.fetch("http://api.localtest.me/v0/projects")
 		const projects = await response.json();
 		expect(projects).toBeInstanceOf(Array);
 		expect(projects.length).toBe(1);
 		expect(projects[0]).toEqual(expect.objectContaining(project));
+		console.log(projects[0].link)
+		expect(projects[0].link).toEqual(expect.stringMatching(/^http::\/\/empty_[a-z0-9-]+\.localtest\.me$/));
 	});
-
 
 	it('creating seeded project', async () => {
 		let seed = {
@@ -30,7 +31,7 @@ describe('worker', () => {
 				{ name: "two", content: "this is the second page" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 		let { project, pages, version } = await response.json();
 		expect(project).toEqual(expect.objectContaining({ name: seed.name }));
@@ -41,12 +42,12 @@ describe('worker', () => {
 			expect(server_page).toHaveProperty('hash');
 
 			// now we can fetch it?
-			let page = await SELF.fetch(`http://api.example.com/v0/raw/${server_page.hash}`)
+			let page = await SELF.fetch(`http://api.localtest.me/v0/raw/${server_page.hash}`)
 			expect(page.status).toBe(200);
 			expect(await page.text()).toEqual(content);
 		}
 		// expect(version).toEqual(expect.objectContaining({ pages }));
-		response = await SELF.fetch("http://api.example.com/v0/projects")
+		response = await SELF.fetch("http://api.localtest.me/v0/projects")
 		const projects = await response.json();
 		expect(projects).toBeInstanceOf(Array);
 		expect(projects.length).toBe(1);
@@ -62,11 +63,11 @@ describe('worker', () => {
 				{ name: "two", content: "this is the second page" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 
 		for (let { name, content } of seed.pages) {
-			response = await SELF.fetch(`http://${seed.name}.example.com/${name}`)
+			response = await SELF.fetch(`http://${seed.name}.localtest.me/${name}`)
 			expect(await response.text()).toEqual(content);
 		}
 	});
@@ -80,17 +81,17 @@ describe('worker', () => {
 				{ name: "deleteme", content: "deletion test" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 
 		let updateData = [
 			{ name: "page", content: "updated content" },
 			{ name: "deleteme", content: null },
 		]
-		response = await SELF.fetch("http://api.example.com/v0/projects/update-test", { method: "PATCH", body: JSON.stringify(updateData) })
+		response = await SELF.fetch("http://api.localtest.me/v0/projects/update-test", { method: "PATCH", body: JSON.stringify(updateData) })
 		expect(response.status).toBe(200);
 
-		response = await SELF.fetch(`http://update-test.example.com/page`)
+		response = await SELF.fetch(`http://update-test.localtest.me/page`)
 		expect(await response.text()).toEqual("updated content");
 	});
 
@@ -102,19 +103,19 @@ describe('worker', () => {
 				{ name: "deleteme", content: "deletion test" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 
-		response = await SELF.fetch(`http://deleting.example.com/deleteme`)
+		response = await SELF.fetch(`http://deleting.localtest.me/deleteme`)
 		expect(response.status).toBe(200);
 
 		let updateData = [
 			{ name: "deleteme", content: null },
 		]
-		response = await SELF.fetch("http://api.example.com/v0/projects/deleting", { method: "PATCH", body: JSON.stringify(updateData) })
+		response = await SELF.fetch("http://api.localtest.me/v0/projects/deleting", { method: "PATCH", body: JSON.stringify(updateData) })
 		expect(response.status).toBe(200);
 
-		response = await SELF.fetch(`http://deleting.example.com/deleteme`)
+		response = await SELF.fetch(`http://deleting.localtest.me/deleteme`)
 		expect(response.status).toBe(404);
 	});
 
@@ -125,27 +126,27 @@ describe('worker', () => {
 				{ name: "existing", content: "existing content" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 		const original_data = await response.json();
 		const original_version_id = original_data.project.live_version_id;
 
-		response = await SELF.fetch(`http://additions.example.com/future`)
+		response = await SELF.fetch(`http://additions.localtest.me/future`)
 		expect(response.status).toBe(404);
 
 		let updateData = [
 			{ name: "future", content: "future content" },
 		]
-		response = await SELF.fetch("http://api.example.com/v0/projects/additions", { method: "PATCH", body: JSON.stringify(updateData) })
+		response = await SELF.fetch("http://api.localtest.me/v0/projects/additions", { method: "PATCH", body: JSON.stringify(updateData) })
 		expect(response.status).toBe(200);
 		let new_data = await response.json();
 		expect(new_data.project.live_version_id).not.toEqual(original_version_id);
 
-		response = await SELF.fetch(`http://additions.example.com/future`)
+		response = await SELF.fetch(`http://additions.localtest.me/future`)
 		expect(response.status).toBe(200);
 		expect(await response.text()).toEqual("future content");
 
-		response = await SELF.fetch(`http://additions.example.com/existing`)
+		response = await SELF.fetch(`http://additions.localtest.me/existing`)
 		expect(response.status).toBe(200);
 		expect(await response.text()).toEqual("existing content");
 	});
@@ -159,14 +160,14 @@ describe('worker', () => {
 				{ name: "other", content: "other content" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 
-		response = await SELF.fetch(`http://index-test.example.com/`)
+		response = await SELF.fetch(`http://index-test.localtest.me/`)
 		expect(response.status).toBe(200);
 		expect(await response.text()).toEqual("index content");
 
-		response = await SELF.fetch(`http://index-test.example.com/index`)
+		response = await SELF.fetch(`http://index-test.localtest.me/index`)
 		expect(response.status).toBe(200);
 		expect(await response.text()).toEqual("index content");
 	});
@@ -178,10 +179,10 @@ describe('worker', () => {
 				{ name: "existing", content: "this page exists" },
 			]
 		}
-		let response = await SELF.fetch("http://api.example.com/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
 
-		response = await SELF.fetch(`http://404-test.example.com/non-existent`)
+		response = await SELF.fetch(`http://404-test.localtest.me/non-existent`)
 		expect(response.status).toBe(404);
 	});
 
