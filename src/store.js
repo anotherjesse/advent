@@ -20,7 +20,7 @@ class ProjectStore {
     this.r2Bucket = r2Bucket;
   }
 
-  async createProject({name, pages}) {
+  async createProject({ name, pages }) {
     validateName(name);
 
     const existingProject = await this.db.prepare(
@@ -36,26 +36,25 @@ class ProjectStore {
       "INSERT INTO projects (name, live_version_id) VALUES (?, ?)"
     ).bind(name, newVersionId).run();
 
-    const pagesMeta = (pages || []).map(p => ({
-      hash: crypto.randomUUID(),
-      id: crypto.randomUUID(),
-      name: p.name,
-    }));
+    const pagesMeta = [];
+    for (const p of (pages || [])) {
+      pagesMeta.push({
+        id: crypto.randomUUID(),
+        hash: await hashContent(p.content),
+        name: p.name,
+      });
+    }
+
+    for (const page of (pages || [])) {
+      const hash = pagesMeta.find(p => p.name === page.name).hash;
+      await this.r2Bucket.put(hash, page.content);
+    }
 
     await this.db.prepare(
       "INSERT INTO versions (id, project_name, parent_version_id, pages) VALUES (?, ?, NULL, ?)"
     ).bind(newVersionId, name, JSON.stringify(pagesMeta)).run();
 
-    for (const page of (pages || [])) {
-      const hash = pagesMeta.find(p => p.name === page.name).hash;
-      const id = pagesMeta.find(p => p.name === page.name).id;
-      await this.r2Bucket.put(hash, page.content);
-      await this.db.prepare(
-        "INSERT INTO pages (id, name, hash) VALUES (?, ?, ?)"
-      ).bind(id, page.name, hash).run();
-    }
-
-    return this.getProject(name, newVersionId );
+    return this.getProject(name, newVersionId);
   }
 
   async getProject(name, versionId = null) {
@@ -87,50 +86,12 @@ class ProjectStore {
     return { project, version, pages };
   }
 
-
-
   async listProjects() {
     const projects = await this.db.prepare(
       "SELECT * FROM projects ORDER BY name"
     ).all();
 
     return projects.results;
-  }
-
-  async createOrUpdatePage(projectName, pageName, content, title = null) {
-    await this.validateName(pageName);
-    const contentHash = await this.hashContent(content);
-    await this.r2Bucket.put(contentHash, content);
-
-    const project = await this.getProject(projectName);
-    const pages = project.pages;
-    const pageIndex = pages.findIndex(p => p.name === pageName);
-
-    if (pageIndex === -1) {
-      pages.push({
-        id: crypto.randomUUID(),
-        name: pageName,
-        title: title || pageName,
-        content_hash: contentHash
-      });
-    } else {
-      pages[pageIndex] = {
-        ...pages[pageIndex],
-        title: title || pages[pageIndex].title,
-        content_hash: contentHash
-      };
-    }
-
-    const newVersionId = crypto.randomUUID();
-    await this.db.prepare(
-      "INSERT INTO versions (id, project_name, parent_version_id, pages) VALUES (?, ?, ?, ?)"
-    ).bind(newVersionId, projectName, project.version, JSON.stringify(pages)).run();
-
-    await this.db.prepare(
-      "UPDATE projects SET live_version_id = ? WHERE name = ?"
-    ).bind(newVersionId, projectName).run();
-
-    return this.getProject(projectName);
   }
 
   async getContent(hash) {
@@ -141,20 +102,44 @@ class ProjectStore {
     return content.text();
   }
 
-  async deletePage(projectName, pageName) {
-    const project = await this.getProject(projectName);
-    const pages = project.pages.filter(p => p.name !== pageName);
+  async updateProject(projectName, changed_pages) {
+    const { project, version, pages } = await this.getProject(projectName);
+
+    let newPages = [...pages];
+
+    for (const { name, content } of changed_pages) {
+      const existingPageIndex = newPages.findIndex(p => p.name === name);
+
+      if (!content) {
+        if (existingPageIndex !== -1) {
+          newPages.splice(existingPageIndex, 1); // delete
+        }
+      } else {
+        const hash = await hashContent(content);
+        if (existingPageIndex !== -1) {
+          newPages[existingPageIndex] = { ...newPages[existingPageIndex], hash };
+        } else {
+          newPages.push({
+            id: crypto.randomUUID(),
+            name,
+            hash,
+          });
+        }
+        await this.r2Bucket.put(hash, content);
+      }
+    }
 
     const newVersionId = crypto.randomUUID();
+
     await this.db.prepare(
       "INSERT INTO versions (id, project_name, parent_version_id, pages) VALUES (?, ?, ?, ?)"
-    ).bind(newVersionId, projectName, project.version, JSON.stringify(pages)).run();
+    ).bind(newVersionId, project.name, project.live_version_id, JSON.stringify(newPages)).run();
 
     await this.db.prepare(
       "UPDATE projects SET live_version_id = ? WHERE name = ?"
-    ).bind(newVersionId, projectName).run();
+    ).bind(newVersionId, project.name).run();
 
-    return this.getProject(projectName);
+    return this.getProject(projectName, newVersionId);
   }
 
   async getPageContent(projectName, pageName) {
