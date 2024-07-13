@@ -20,7 +20,8 @@ describe('worker', () => {
 		expect(projects.length).toBe(1);
 		expect(projects[0]).toEqual(expect.objectContaining(project));
 		console.log(projects[0].link)
-		expect(projects[0].link).toEqual(expect.stringMatching(/^http::\/\/empty_[a-z0-9-]+\.localtest\.me$/));
+		expect(projects[0].version_link).toEqual(expect.stringMatching(/^http:\/\/empty_[a-z0-9-]+\.localtest\.me$/));
+		expect(projects[0].project_link).toEqual(expect.stringMatching(/^http:\/\/empty\.localtest\.me$/));
 	});
 
 	it('creating seeded project', async () => {

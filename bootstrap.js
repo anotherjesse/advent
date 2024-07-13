@@ -22,6 +22,9 @@ class CodetteClient {
 
     async getProject(projectName) {
         const response = await fetch(`${this.baseUrl}/v0/projects/${projectName}`);
+        if (response.status === 404) {
+            return null;
+        }
         return response.json();
     }
 
@@ -46,7 +49,8 @@ class CodetteClient {
 }
 
 async function importDirectory(importPath) {
-    const client = new CodetteClient('http://api.localtest.me:8787');
+    const url = process.env.CODETTE_API_URL || 'http://api.localtest.me:8787';
+    const client = new CodetteClient(url);
 
     const projectName = path.basename(importPath);
     const pageName = (filePath) => path.basename(filePath, path.extname(filePath));

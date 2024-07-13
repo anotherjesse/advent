@@ -22,7 +22,7 @@
     <textarea id="pageContent" rows="20" cols="80"></textarea>
 
     <script>
-        const API_URL = 'http://api.localtest.me:8787/v0';
+        const API_URL = window.location.protocol + '//api.' + window.location.hostname.split('.').slice(-2).join('.') + (window.location.port ? ':' + window.location.port : '');
         const urlParams = new URLSearchParams(window.location.search);
         const projectName = urlParams.get('project');
 
@@ -31,7 +31,7 @@
         // Add this new function to load and display the page list
         async function loadPageList() {
             try {
-                const response = await fetch(`${API_URL}/projects/${projectName}`);
+                const response = await fetch(`${API_URL}/v0/projects/${projectName}`);
                 if (!response.ok) {
                     throw new Error('Failed to load project');
                 }
@@ -72,7 +72,7 @@
             }
 
             try {
-                const response = await fetch(`${API_URL}/projects/${projectName}`);
+                const response = await fetch(`${API_URL}/v0/projects/${projectName}`);
                 if (!response.ok) {
                     throw new Error('Failed to load project');
                 }
@@ -80,7 +80,7 @@
 
                 const page = project.pages.find(p => p.name === pageName);
                 if (page) {
-                    const contentResponse = await fetch(`${API_URL}/raw/${page.hash}`);
+                    const contentResponse = await fetch(`${API_URL}/v0/raw/${page.hash}`);
                     if (!contentResponse.ok) {
                         throw new Error('Failed to load page content');
                     }
@@ -110,7 +110,7 @@
             }
 
             try {
-                const response = await fetch(`${API_URL}/projects/${projectName}`, {
+                const response = await fetch(`${API_URL}/v0/projects/${projectName}`, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',
@@ -140,7 +140,7 @@
             }
 
             try {
-                const response = await fetch(`${API_URL}/projects/${projectName}/pages/${pageName}/generate`, {
+                const response = await fetch(`${API_URL}/v0/projects/${projectName}/pages/${pageName}/generate`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

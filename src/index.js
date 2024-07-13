@@ -12,8 +12,9 @@ const withStore = async (request, env) => {
 	if (hostparts.length > 2) {
 		host = hostparts.slice(-2).join('.');
 	}
-	env.linkify = (project, include_version) => {
-		project.link = `${url.protocol}://${project.name}${include_version ? `_${project.live_version_id}` : ''}.${host}`
+	env.linkify = (project) => {
+		project.project_link = `${url.protocol}//${project.name}.${host}`
+		project.version_link = `${url.protocol}//${project.name}_${project.live_version_id}.${host}`
 	}
 }
 
@@ -63,9 +64,14 @@ router
 	})
 	.get('/v0/projects/:project_name', async (request, env) => {
 		const { project_name } = request.params;
-		const p = await env.store.getProject(project_name);
-		env.linkify(p, true)
-		return json(p)
+		try {
+			const p = await env.store.getProject(project_name);
+			env.linkify(p, true)
+			return json(p)
+		} catch (e) {
+			console.log(e)
+			return error(404, 'Project not found');
+		}
 	})
 	.patch('/v0/projects/:project_name', async (request, env) => {
 		const { project_name } = request.params;

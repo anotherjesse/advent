@@ -16,15 +16,16 @@
     <table id="projectList"></table>
 
     <script>
-        const API_URL = 'http://api.localtest.me:8787/v0';
+        const API_URL = window.location.protocol + '//api.' + window.location.hostname.split('.').slice(-2).join('.') + (window.location.port ? ':' + window.location.port : '');
 
         async function listProjects() {
             try {
-                const response = await fetch(`${API_URL}/projects`);
+                const response = await fetch(`${API_URL}/v0/projects`);
                 const projects = await response.json();
                 const projectList = document.getElementById('projectList');
                 projectList.innerHTML = '<tr><th>Project</th><th>Edit</th><th>View</th><th>Version</th></tr>';
                 projects.forEach(project => {
+                    console.log({project})
                     const tr = document.createElement('tr');
                     
                     const tdName = document.createElement('td');
@@ -40,15 +41,15 @@
 
                     const tdView = document.createElement('td');
                     const aView = document.createElement('a');
-                    aView.href = `http://${project.name}.localtest.me:8787/`;
+                    aView.href = project.project_link
                     aView.textContent = project.name;
                     tdView.appendChild(aView);
                     tr.appendChild(tdView);
 
                     const tdVersion = document.createElement('td');
                     const aVersion = document.createElement('a');
-                    aVersion.href = `http://${project.name}_${project.version}.localtest.me:8787/`;
-                    aVersion.textContent = project.version;
+                    aVersion.href = project.version_link
+                    aVersion.textContent = project.live_version_id;
                     tdVersion.appendChild(aVersion);
                     tr.appendChild(tdVersion);
 
@@ -66,7 +67,7 @@
                 return;
             }
             try {
-                const response = await fetch(`${API_URL}/projects`, {
+                const response = await fetch(`${API_URL}/v0/projects`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
