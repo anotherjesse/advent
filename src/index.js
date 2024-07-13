@@ -4,6 +4,8 @@ import ProjectStore from './store';  // Import the ProjectStore class we created
 
 const withStore = async (request, env) => {
 	env.store = new ProjectStore(env.DB, env.R2);
+
+	// FIXME(ja): for security should we require domain to be the one we are deploying for?
 	let url = new URL(request.url);
 	let host = url.host;
 	let hostparts = host.split('.');
@@ -20,11 +22,27 @@ const debugError = (error, env) => {
 	return json({ error: "Internal Server Error", message: error.message }, 500)
 }
 
+// FIXME(ja): the only origin for API should eventually only allow admin.domain ?
+const corsHeaders = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+	'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 const router = Router({
 	before: [withParams, withStore],
 	catch: debugError,
-	finally: [json],
+	finally: [(response) => {
+		if (response instanceof Response) {
+			Object.entries(corsHeaders).forEach(([key, value]) => {
+				response.headers.set(key, value);
+			});
+		}
+		return response;
+	}, json],
 })
+
+router.options('*', () => new Response(null, { status: 204, headers: corsHeaders }))
 
 router
 	.get("/v0/debug", async (request, env) => {

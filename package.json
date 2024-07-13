@@ -5,6 +5,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "bootstrap": "node bootstrap.js",
     "start": "wrangler dev",
     "test": "vitest"
   },
