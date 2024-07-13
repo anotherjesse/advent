@@ -1,79 +1,184 @@
-export default {
-	async fetch(request, env, ctx) {
+import { Router, error, json, withParams } from 'itty-router'
+import ProjectStore from './store';  // Import the ProjectStore class we created earlier
+
+
+const withStore = async (request, env) => {
+	env.store = new ProjectStore(env.DB, env.R2);
+}
+
+
+// Helper function to generate content (placeholder)
+async function generateContent(messages) {
+	// This is a placeholder. In a real implementation, you would call your AI service here.
+	return "Generated content based on: " + messages.join(" ");
+}
+
+const myError = (error, env) => {
+	console.log(error)
+	return json({ error: "Internal Server Error", message: error.message }, 500)
+}
+
+const router = Router({
+	before: [withParams, withStore],
+	catch: myError,
+	finally: [json],
+})
+
+router
+
+	.get('/v0/projects', async (request, env) => {
+		const projects = await env.store.listProjects();
+		return json(projects);
+	})
+	.post('/v0/projects', async (request, env) => {
+		const params = await request.json();
+		const p = await env.store.createProject(params)
+		return json(p)
+	})
+	.get("/v0/raw/:hash", async (request, env) => {
+		const { hash } = request.params;
+		const html = await env.store.getContent(hash);
+		return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+	})
+	.get("/", async (request, env) => {
+		return json({ message: "Hello World!" });
+	})
+	.get('/:pageName?', async (request, env) => {
+		const { pageName = 'index' } = request.params;
 		const url = new URL(request.url);
+		const subdomain = url.hostname.split('.')[0];
+		const project = await env.store.getProject(subdomain);
+		const page = project.pages.find(p => p.name === pageName);
+		const html = await env.store.getContent(page.hash);
+		return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+	})
 
-		// Check if the path includes 'dl'
-		if (url.pathname.includes('dl')) {
-			try {
-				// Construct the cache key from the cache URL
-				const cacheKey = new Request(url.toString(), request);
-				const cache = caches.default;
+// 	.post('/projects', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const body = await parseJSONBody(request);
+// 		if (!body || !body.name || !Array.isArray(body.pages)) {
+// 			return error(400, 'Invalid request body');
+// 		}
+// 		try {
+// 			const project = await projectStore.createProject(body.name, body.pages);
+// 			return json(project, 201);
+// 		} catch (e) {
+// 			return error(409, e.message);
+// 		}
+// 	})
 
-				// Check whether the value is already available in the cache
-				let response = await cache.match(cacheKey);
+// 	.get('/projects/:projectName', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const { projectName } = request.params;
+// 		try {
+// 			const project = await projectStore.getProject(projectName);
+// 			return json(project);
+// 		} catch (e) {
+// 			return error(404, 'Project not found');
+// 		}
+// 	})
 
-				if (response) {
-					console.log(`Cache hit for: ${request.url}.`);
-					return response;
-				}
+// 	.get('/projects/:projectName/versions', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const { projectName } = request.params;
+// 		const versions = await projectStore.listProjectVersions(projectName);
+// 		return json(versions);
+// 	})
 
-				console.log(`Response for request url: ${request.url} not present in cache. Fetching and caching request.`);
+// 	.post('/projects/:projectName/pages', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const { projectName } = request.params;
+// 		const body = await parseJSONBody(request);
+// 		if (!body || !body.name || !body.content) {
+// 			return error(400, 'Invalid request body');
+// 		}
+// 		const updatedProject = await projectStore.createOrUpdatePage(projectName, body.name, body.content, body.title);
+// 		return json(updatedProject, 201);
+// 	})
 
-				// If not in cache, get it from ASSETS
-				const object = await env.ASSETS.get('wolf-4s.mp3', {
-					range: request.headers,
-					onlyIf: request.headers,
-				})
+// 	.post('/projects/:projectName/pages/:pageName/generate', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const { projectName, pageName } = request.params;
+// 		const body = await parseJSONBody(request);
+// 		if (!body || !body.prompt) {
+// 			return error(400, 'Invalid request body');
+// 		}
 
-				if (object === null) {
-					return new Response('Object Not Found', { status: 404 });
-				}
+// 		const messages = [];
+// 		try {
+// 			const page = await projectStore.getPageContent(projectName, pageName);
+// 			if (page) {
+// 				messages.push("What is the current page content?");
+// 				messages.push(page);
+// 			}
+// 		} catch (e) {
+// 			// Page doesn't exist, which is fine
+// 		}
 
-				const headers = new Headers()
-				object.writeHttpMetadata(headers)
-				headers.set('etag', object.httpEtag)
-				if (object.range) {
-					headers.set("content-range", `bytes ${object.range.offset}-${object.range.end ?? object.size - 1}/${object.size}`)
-				}
-				// Cache for 60 seconds
-				headers.append('Cache-Control', 's-maxage=60');
+// 		messages.push(body.prompt);
+// 		const content = await generateContent(messages);
+// 		const updatedProject = await projectStore.createOrUpdatePage(projectName, pageName, content);
+// 		return json(updatedProject, 201);
+// 	})
 
-				const status = object.body ? (request.headers.get("range") !== null ? 206 : 200) : 304
-				response = new Response(object.body, {
-					headers,
-					status
-				})
+// 	.delete('/projects/:projectName/pages/:pageName', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const { projectName, pageName } = request.params;
+// 		const updatedProject = await projectStore.deletePage(projectName, pageName);
+// 		return json(updatedProject);
+// 	});
 
-				// Store the fetched response as cacheKey
-				ctx.waitUntil(cache.put(cacheKey, response.clone()));
+// // Content Routes
+// contentRouter
+// 	.get('/:pageName?', async (request, env) => {
+// 		const projectStore = new ProjectStore(env.DB, env.R2);
+// 		const { pageName = 'index' } = request.params;
+// 		const url = new URL(request.url);
+// 		const subdomain = url.hostname.split('.')[0];
 
-				return response;
-			} catch (e) {
-				return new Response('Error thrown ' + e.message);
-			}
-		}
+// 		let projectName, versionName;
+// 		if (subdomain.includes('_')) {
+// 			[projectName, versionName] = subdomain.split('_');
+// 		} else {
+// 			projectName = subdomain;
+// 			versionName = null;
+// 		}
 
-		// Create an object to store all headers
-		const headers = {};
+// 		try {
+// 			const project = await projectStore.getProject(projectName, versionName);
+// 			const page = project.pages.find(p => p.name === pageName);
+// 			if (page) {
+// 				const content = await projectStore.getPageContent(projectName, pageName);
+// 				return new Response(content, {
+// 					headers: { 'Content-Type': 'text/html' },
+// 				});
+// 			}
+// 		} catch (e) {
+// 			// Project or page not found
+// 		}
 
-		// Iterate through all headers in the request
-		for (const [key, value] of request.headers.entries()) {
-			headers[key] = value;
-		}
+// 		return error(404, 'Page not found');
+// 	});
 
-		// Add some information about the request
-		headers['cf-connecting-ip'] = request.headers.get('cf-connecting-ip');
-		headers['cf-ipcountry'] = request.cf.country;
-		headers['cf-ray'] = request.headers.get('cf-ray');
+// // Main router
+// const router = Router();
 
-		// Create a JSON response
-		const jsonResponse = JSON.stringify(headers, null, 2);
+// router
+// .all('/api/v0/*', apiRouter.handle)
+// .all('*', contentRouter.handle);
 
-		// Return the JSON response with appropriate headers
-		return new Response(jsonResponse, {
-			headers: {
-				'Content-Type': 'application/json',
-			},
-		});
-	},
-};
+// // Export the fetch handler
+// export default {
+
+// 	async fetch(request, env) {
+// 		if (env.router === undefined) {
+// 			env.router = buildRouter(env)
+// 		}
+
+// 		return env.router.handle(request)
+// 	}
+// }
+
+
+
+export default router
