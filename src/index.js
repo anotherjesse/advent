@@ -1,6 +1,7 @@
 import { Router, error, json, withParams } from 'itty-router'
 import ProjectStore from './store';  // Import the ProjectStore class we created earlier
-
+import { Client } from './claudette';
+const coder = `You are an expert web developer, you are tasked with producing a single html files.  All of your code should be inline in the html file, but you can use CDNs to import packages if needed.`
 
 const withStore = async (request, env) => {
 	env.store = new ProjectStore(env.DB, env.R2);
@@ -52,21 +53,21 @@ router
 	.get('/v0/projects', async (request, env) => {
 		const projects = await env.store.listProjects();
 		projects.forEach(p => {
-			env.linkify(p, true)
+			env.linkify(p)
 		})
 		return json(projects);
 	})
 	.post('/v0/projects', async (request, env) => {
 		const params = await request.json();
 		const p = await env.store.createProject(params)
-		env.linkify(p, true)
+		env.linkify(p)
 		return json(p)
 	})
 	.get('/v0/projects/:project_name', async (request, env) => {
 		const { project_name } = request.params;
 		try {
 			const p = await env.store.getProject(project_name);
-			env.linkify(p, true)
+			env.linkify(p)
 			return json(p)
 		} catch (e) {
 			console.log(e)
@@ -77,8 +78,22 @@ router
 		const { project_name } = request.params;
 		const changed_pages = await request.json();
 		const p = await env.store.updateProject(project_name, changed_pages);
-		env.linkify(p, true)
+		env.linkify(p)
 		return json(p)
+	})
+	.post("/v0/projects/:project_name/pages/:page_name/generate", async (request, env) => {
+		const { project_name, page_name } = request.params;
+		const { prompt } = await request.json();
+		const chat = new Client(env.ANTHROPIC_API_KEY);
+		const response = await chat.call(prompt, { prefill: "<html>", sp: coder });
+		console.log({ response })
+		let content = response.content[0].text
+
+		const p = await env.store.updateProject(project_name, [{
+			name: page_name,
+			content: content
+		}]);
+		return json(p);
 	})
 	.get("/v0/raw/:hash", async (request, env) => {
 		const { hash } = request.params;
