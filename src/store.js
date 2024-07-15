@@ -50,6 +50,7 @@ class ProjectStore {
         id: crypto.randomUUID(),
         hash: await hashContent(p.content),
         name: p.name,
+        metadata: p.metadata || {},  // Add metadata field
       });
     }
 
@@ -115,7 +116,7 @@ class ProjectStore {
 
     let newPages = [...pages];
 
-    for (const { name, content } of changed_pages) {
+    for (const { name, content, metadata } of changed_pages) {
       const existingPageIndex = newPages.findIndex(p => p.name === name);
 
       if (!content) {
@@ -125,12 +126,17 @@ class ProjectStore {
       } else {
         const hash = await hashContent(content);
         if (existingPageIndex !== -1) {
-          newPages[existingPageIndex] = { ...newPages[existingPageIndex], hash };
+          newPages[existingPageIndex] = { 
+            ...newPages[existingPageIndex], 
+            hash,
+            metadata: metadata || newPages[existingPageIndex].metadata,  // Update metadata
+          };
         } else {
           newPages.push({
             id: crypto.randomUUID(),
             name,
             hash,
+            metadata: metadata || {},  // Add metadata for new pages
           });
         }
         await this.r2Bucket.put(hash, content);

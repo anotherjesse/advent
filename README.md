@@ -1,5 +1,7 @@
 API issues
 
+- [ ] store metadata for projects / pages
+- [ ] store prompt or spec for a page?
 - [ ] patch should always work in the context of a version
 - [ ] generation needs to be re-added
 

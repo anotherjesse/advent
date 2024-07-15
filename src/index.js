@@ -47,9 +47,6 @@ const router = Router({
 router.options('*', () => new Response(null, { status: 204, headers: corsHeaders }))
 
 router
-	.get("/v0/debug", async (request, env) => {
-		return json({ request: request.url, base: env.base })
-	})
 	.get('/v0/projects', async (request, env) => {
 		const projects = await env.store.listProjects();
 		projects.forEach(p => {
@@ -59,6 +56,13 @@ router
 	})
 	.post('/v0/projects', async (request, env) => {
 		const params = await request.json();
+		// Ensure pages have metadata field if provided
+		if (params.pages) {
+			params.pages = params.pages.map(page => ({
+				...page,
+				metadata: page.metadata || {},
+			}));
+		}
 		const p = await env.store.createProject(params)
 		env.linkify(p)
 		return json(p)
@@ -77,7 +81,12 @@ router
 	.patch('/v0/projects/:project_name', async (request, env) => {
 		const { project_name } = request.params;
 		const changed_pages = await request.json();
-		const p = await env.store.updateProject(project_name, changed_pages);
+		// Ensure changed pages have metadata field if provided
+		const updatedPages = changed_pages.map(page => ({
+			...page,
+			metadata: page.metadata !== undefined ? page.metadata : {},
+		}));
+		const p = await env.store.updateProject(project_name, updatedPages);
 		env.linkify(p)
 		return json(p)
 	})
@@ -85,13 +94,26 @@ router
 		const { project_name, page_name } = request.params;
 		const { prompt } = await request.json();
 		const chat = new Client(env.ANTHROPIC_API_KEY);
-		const response = await chat.call(prompt, { prefill: "<html>", sp: coder });
-		console.log({ response })
-		let content = response.content[0].text
+
+		// Get the current project and page
+		const project = await env.store.getProject(project_name);
+		const currentPage = project.pages.find(p => p.name === page_name);
+
+		// Prepare messages including previous spec, HTML, and new prompt
+		const messages = [
+			currentPage.metadata.spec || '',
+			await env.store.getContent(currentPage.hash),
+			prompt
+		];
+
+		const response = await chat.call(messages, { prefill: "<html>", sp: coder });
+		console.log({ response });
+		let content = response.content[0].text;
 
 		const p = await env.store.updateProject(project_name, [{
 			name: page_name,
-			content: content
+			content: content,
+			metadata: { spec: prompt }
 		}]);
 		return json(p);
 	})
@@ -133,34 +155,5 @@ router
 			return error(500, 'Content missing');
 		}
 	})
-
-
-// 	.post('/projects/:projectName/pages/:pageName/generate', async (request, env) => {
-// 		const projectStore = new ProjectStore(env.DB, env.R2);
-// 		const { projectName, pageName } = request.params;
-// 		const body = await parseJSONBody(request);
-// 		if (!body || !body.prompt) {
-// 			return error(400, 'Invalid request body');
-// 		}
-
-// 		const messages = [];
-// 		try {
-// 			const page = await projectStore.getPageContent(projectName, pageName);
-// 			if (page) {
-// 				messages.push("What is the current page content?");
-// 				messages.push(page);
-// 			}
-// 		} catch (e) {
-// 			// Page doesn't exist, which is fine
-// 		}
-
-// 		messages.push(body.prompt);
-// 		const content = await generateContent(messages);
-// 		const updatedProject = await projectStore.createOrUpdatePage(projectName, pageName, content);
-// 		return json(updatedProject, 201);
-// 	})
-
-
-
 
 export default router

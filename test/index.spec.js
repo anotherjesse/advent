@@ -187,4 +187,78 @@ describe('worker', () => {
 		expect(response.status).toBe(404);
 	});
 
+	it('creating seeded project with page metadata', async () => {
+		let seed = {
+			name: "metadata-test",
+			pages: [
+				{ 
+					name: "page-with-meta", 
+					content: "This page has metadata",
+					metadata: {
+						spec: "v1.0",
+						customKey: "customValue"
+					}
+				},
+				{ 
+					name: "page-without-meta", 
+					content: "This page has no metadata" 
+				},
+			]
+		}
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		expect(response.status).toBe(200);
+		let { project, pages, version } = await response.json();
+		expect(project).toEqual(expect.objectContaining({ name: seed.name }));
+		
+		for (let { name, content, metadata } of seed.pages) {
+			let server_page = pages.find(p => p.name === name);
+			expect(server_page).toEqual(expect.objectContaining({ name }));
+			expect(server_page).not.toHaveProperty('content');
+			expect(server_page).toHaveProperty('hash');
+			
+			if (metadata) {
+				expect(server_page.metadata).toEqual(metadata);
+			} else {
+				expect(server_page.metadata).toEqual({});
+			}
+
+			// Fetch and check content
+			let page = await SELF.fetch(`http://api.localtest.me/v0/raw/${server_page.hash}`)
+			expect(page.status).toBe(200);
+			expect(await page.text()).toEqual(content);
+		}
+	});
+
+	it('updating page metadata', async () => {
+		let seed = {
+			name: "update-metadata",
+			pages: [
+				{ 
+					name: "meta-page", 
+					content: "Original content",
+					metadata: { spec: "v1.0" }
+				},
+			]
+		}
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		expect(response.status).toBe(200);
+
+		let updateData = [
+			{ 
+				name: "meta-page", 
+				content: "Updated content",
+				metadata: { spec: "v2.0", newKey: "newValue" }
+			},
+		]
+		response = await SELF.fetch("http://api.localtest.me/v0/projects/update-metadata", { method: "PATCH", body: JSON.stringify(updateData) })
+		expect(response.status).toBe(200);
+		
+		let updatedProject = await response.json();
+		let updatedPage = updatedProject.pages.find(p => p.name === "meta-page");
+		expect(updatedPage.metadata).toEqual({ spec: "v2.0", newKey: "newValue" });
+
+		response = await SELF.fetch(`http://update-metadata.localtest.me/meta-page`)
+		expect(await response.text()).toEqual("Updated content");
+	});
+
 });

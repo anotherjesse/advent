@@ -56,11 +56,22 @@ async function importDirectory(importPath) {
     const pageName = (filePath) => path.basename(filePath, path.extname(filePath));
 
     const files = fs.readdirSync(importPath);
-    const pages = files.map(file => {
+    const pages = files.filter(file => file.endsWith('.html')).map(file => {
         const filePath = path.join(importPath, file);
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const name = pageName(file);
+        
+        // Read spec from corresponding .md file if it exists
+        let metadata = {};
+        const specFile = path.join(importPath, `${name}.md`);
+        if (fs.existsSync(specFile)) {
+            metadata.spec = fs.readFileSync(specFile, 'utf-8');
+        }
+
         return {
-            name: pageName(file),
-            content: fs.readFileSync(filePath, 'utf-8')
+            name,
+            content,
+            metadata
         };
     });
 
