@@ -121,6 +121,27 @@ router
 		const html = await env.store.getContent(hash);
 		return new Response(html, { headers: { 'Content-Type': 'text/html' } });
 	})
+	.get('/v0/projects/:project_name/versions', async (request, env) => {
+		const { project_name } = request.params;
+		try {
+			const versions = await env.store.listProjectVersions(project_name);
+			return json(versions);
+		} catch (e) {
+			console.log(e);
+			return error(404, 'Project not found');
+		}
+	})
+	.get('/v0/projects/:project_name/versions/:version_id', async (request, env) => {
+		const { project_name, version_id } = request.params;
+		try {
+			const p = await env.store.getProject(project_name, version_id);
+			env.linkify(p.project);
+			return json(p);
+		} catch (e) {
+			console.log(e);
+			return error(404, 'Project version not found');
+		}
+	})
 	.get("/favicon.ico", async (request, env) => {
 		return new Response(null, { status: 204 });
 	})
@@ -152,27 +173,6 @@ router
 			return new Response(html, { headers: { 'Content-Type': 'text/html' } });
 		} catch (e) {
 			return error(500, 'Content missing');
-		}
-	})
-	.get('/v0/projects/:project_name/versions', async (request, env) => {
-		const { project_name } = request.params;
-		try {
-			const versions = await env.store.listProjectVersions(project_name);
-			return json(versions);
-		} catch (e) {
-			console.log(e);
-			return error(404, 'Project not found');
-		}
-	})
-	.get('/v0/projects/:project_name/versions/:version_id', async (request, env) => {
-		const { project_name, version_id } = request.params;
-		try {
-			const p = await env.store.getProject(project_name, version_id);
-			env.linkify(p.project);
-			return json(p);
-		} catch (e) {
-			console.log(e);
-			return error(404, 'Project version not found');
 		}
 	})
 

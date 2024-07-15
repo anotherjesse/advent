@@ -270,6 +270,7 @@ describe('worker', () => {
 		}
 		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
 		expect(response.status).toBe(200);
+		let initialProject = await response.json();
 
 		// Update the project to create a new version
 		let updateData = [
@@ -278,7 +279,7 @@ describe('worker', () => {
 		response = await SELF.fetch("http://api.localtest.me/v0/projects/version-test", { method: "PATCH", body: JSON.stringify(updateData) })
 		expect(response.status).toBe(200);
 
-		 // List versions
+		// List versions
 		response = await SELF.fetch("http://api.localtest.me/v0/projects/version-test/versions")
 		expect(response.status).toBe(200);
 		let versions = await response.json();
@@ -288,6 +289,7 @@ describe('worker', () => {
 		expect(versions[0]).toHaveProperty('created_at');
 		expect(versions[1]).toHaveProperty('id');
 		expect(versions[1]).toHaveProperty('created_at');
+		expect(versions[1].parent_id).toBe(versions[0].id);
 	});
 
 	it('getting specific project version', async () => {
@@ -315,6 +317,7 @@ describe('worker', () => {
 		let initialVersion = await response.json();
 		expect(initialVersion.version.id).toBe(initialProject.version.id);
 		expect(initialVersion.pages[0].hash).toBe(initialProject.pages[0].hash);
+		expect(initialVersion.version.parent_id).toBeNull();
 
 		// Get the updated version
 		response = await SELF.fetch(`http://api.localtest.me/v0/projects/specific-version-test/versions/${updatedProject.version.id}`)
@@ -322,6 +325,7 @@ describe('worker', () => {
 		let updatedVersion = await response.json();
 		expect(updatedVersion.version.id).toBe(updatedProject.version.id);
 		expect(updatedVersion.pages[0].hash).toBe(updatedProject.pages[0].hash);
+		expect(updatedVersion.version.parent_id).toBe(initialProject.version.id);
 	});
 
 });

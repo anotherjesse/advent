@@ -12,7 +12,7 @@ CREATE TABLE projects (
 CREATE TABLE versions (
     id UUID PRIMARY KEY,
     project_name TEXT NOT NULL,
-    parent_version_id UUID,
+    parent_id UUID,
     pages JSON,
     metadata JSON,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,

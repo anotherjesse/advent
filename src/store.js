@@ -60,7 +60,7 @@ class ProjectStore {
     }
 
     await this.db.prepare(
-      "INSERT INTO versions (id, project_name, parent_version_id, pages) VALUES (?, ?, NULL, ?)"
+      "INSERT INTO versions (id, project_name, parent_id, pages) VALUES (?, ?, NULL, ?)"
     ).bind(newVersionId, name, JSON.stringify(pagesMeta)).run();
 
     return this.getProject(name, newVersionId);
@@ -88,6 +88,8 @@ class ProjectStore {
     }
 
     const pages = JSON.parse(version.pages);
+
+    version.parent_id = version.parent_id || null;
 
     return { project, version, pages };
   }
@@ -143,8 +145,8 @@ class ProjectStore {
     const newVersionId = createVersionId();
 
     await this.db.prepare(
-      "INSERT INTO versions (id, project_name, parent_version_id, pages) VALUES (?, ?, ?, ?)"
-    ).bind(newVersionId, project.name, project.live_version_id, JSON.stringify(newPages)).run();
+      "INSERT INTO versions (id, project_name, parent_id, pages) VALUES (?, ?, ?, ?)"
+    ).bind(newVersionId, project.name, version.id, JSON.stringify(newPages)).run();
 
     await this.db.prepare(
       "UPDATE projects SET live_version_id = ? WHERE name = ?"
@@ -178,7 +180,7 @@ class ProjectStore {
 
   async listProjectVersions(projectName) {
     const versions = await this.db.prepare(
-      "SELECT id, created_at FROM versions WHERE project_name = ?"
+      "SELECT id, created_at, parent_id FROM versions WHERE project_name = ?"
     ).bind(projectName).all();
 
     if (!versions.results.length) {
@@ -187,7 +189,8 @@ class ProjectStore {
 
     return versions.results.map(v => ({
       id: v.id,
-      created_at: v.created_at
+      created_at: v.created_at,
+      parent_id: v.parent_id
     })).sort((a, b) => b.created_at - a.created_at);
   }
 }
