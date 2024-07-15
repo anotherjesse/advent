@@ -79,28 +79,25 @@ class ProjectStore {
       versionId = project.live_version_id;
     }
 
-    let version;
-    if (versionId) {
-      version = await this.db.prepare(
-        "SELECT * FROM versions WHERE id = ?"
-      ).bind(versionId).first();
-    }
+    let version = await this.db.prepare(
+      "SELECT * FROM versions WHERE id = ? AND project_name = ?"
+    ).bind(versionId, name).first();
 
     if (!version) {
       throw new Error("Version not found");
     }
 
-    const pages = version ? JSON.parse(version.pages) : [];
+    const pages = JSON.parse(version.pages);
 
     return { project, version, pages };
   }
 
   async listProjects() {
     const projects = await this.db.prepare(
-      "SELECT * FROM projects ORDER BY name"
+      "SELECT * FROM projects"
     ).all();
 
-    return projects.results;
+    return projects.results.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getContent(hash) {
@@ -181,9 +178,17 @@ class ProjectStore {
 
   async listProjectVersions(projectName) {
     const versions = await this.db.prepare(
-      "SELECT id FROM versions WHERE project_name = ? ORDER BY id DESC"
+      "SELECT id, created_at FROM versions WHERE project_name = ?"
     ).bind(projectName).all();
-    return versions.results.map(v => v.id);
+
+    if (!versions.results.length) {
+      throw new Error("Project not found");
+    }
+
+    return versions.results.map(v => ({
+      id: v.id,
+      created_at: v.created_at
+    })).sort((a, b) => b.created_at - a.created_at);
   }
 }
 
