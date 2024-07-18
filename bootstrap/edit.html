@@ -10,6 +10,8 @@
 <body>
     <h1>Edit Project: <span id="projectName"></span></h1>
 
+    <div id="versionList"></div>
+
     <div>
         <input type="text" id="pageName" placeholder="Enter page name">
         <button onclick="loadPage()">Load Page</button>
@@ -29,13 +31,19 @@
         const API_URL = window.location.protocol + '//api.' + window.location.hostname.split('.').slice(-2).join('.') + (window.location.port ? ':' + window.location.port : '');
         const urlParams = new URLSearchParams(window.location.search);
         const projectName = urlParams.get('project');
+        const versionId = urlParams.get('version');
 
         document.getElementById('projectName').textContent = projectName;
 
         // Add this new function to load and display the page list
         async function loadPageList() {
             try {
-                const response = await fetch(`${API_URL}/v0/projects/${projectName}`);
+                let response;
+                if (versionId) {
+                    response = await fetch(`${API_URL}/v0/projects/${projectName}/versions/${versionId}`);
+                } else {
+                    response = await fetch(`${API_URL}/v0/projects/${projectName}`);
+                }
                 if (!response.ok) {
                     throw new Error('Failed to load project');
                 }
@@ -64,8 +72,39 @@
             }
         }
 
-        // Call loadPageList when the page loads
+        async function loadVersionList() {
+            try {
+                const response = await fetch(`${API_URL}/v0/projects/${projectName}/versions`);
+                if (!response.ok) {
+                    throw new Error('Failed to load versions');
+                }
+                const versions = await response.json();
+
+                const versionListElement = document.getElementById('versionList');
+                versionListElement.innerHTML = '<h3>Versions:</h3>';
+                const ul = document.createElement('ul');
+                versions.forEach(version => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.href = `?project=${projectName}&version=${version.id}`;
+                    a.textContent = `Version ${version.id}`;
+                    if (version.id === versionId) {
+                        a.textContent += ' (current)';
+                        a.style.fontWeight = 'bold';
+                    }
+                    li.appendChild(a);
+                    ul.appendChild(li);
+                });
+                versionListElement.appendChild(ul);
+            } catch (error) {
+                console.error('Error loading version list:', error);
+                alert('Error loading version list');
+            }
+        }
+
+        // Call loadPageList and loadVersionList when the page loads
         loadPageList();
+        loadVersionList();
 
         // Modify the loadPage function to refresh the page list after loading
         async function loadPage() {
@@ -118,7 +157,13 @@
             }
 
             try {
-                const response = await fetch(`${API_URL}/v0/projects/${projectName}`, {
+                let url;
+                if (versionId) {
+                    url = `${API_URL}/v0/projects/${projectName}/${versionId}`;
+                } else {
+                    url = `${API_URL}/v0/projects/${projectName}`;
+                }
+                const response = await fetch(url, {
                     method: 'PATCH',
                     headers: {
                         'Content-Type': 'application/json',

@@ -319,6 +319,7 @@ describe('worker', () => {
 		expect(initialVersion.pages[0].hash).toBe(initialProject.pages[0].hash);
 		expect(initialVersion.version.parent_id).toBeNull();
 
+
 		// Get the updated version
 		response = await SELF.fetch(`http://api.localtest.me/v0/projects/specific-version-test/versions/${updatedProject.version.id}`)
 		expect(response.status).toBe(200);
@@ -328,4 +329,58 @@ describe('worker', () => {
 		expect(updatedVersion.version.parent_id).toBe(initialProject.version.id);
 	});
 
+	it('updating an older version', async () => {
+		let seed = {
+			name: "version-update-test",
+			pages: [
+				{ name: "page", content: "initial content" },
+			]
+		}
+		let response = await SELF.fetch("http://api.localtest.me/v0/projects", { method: "POST", body: JSON.stringify(seed) })
+		expect(response.status).toBe(200);
+		let initialProject = await response.json();
+		const initialVersionId = initialProject.version.id;
+
+		// Create a new version
+		let updateData = [
+			{ name: "page", content: "updated content" },
+			{ name: "other", content: "other content" },
+		]
+		response = await SELF.fetch("http://api.localtest.me/v0/projects/version-update-test", { method: "PATCH", body: JSON.stringify(updateData) })
+		expect(response.status).toBe(200);
+		let updatedProject = await response.json();
+		expect(updatedProject.version.id).not.toEqual(initialVersionId);
+
+		// Update the initial version
+		let revertData = [
+			{ name: "page", content: "reverted content" },
+		]
+		response = await SELF.fetch(`http://api.localtest.me/v0/projects/version-update-test/${initialVersionId}`, { method: "PATCH", body: JSON.stringify(revertData) })
+		expect(response.status).toBe(200);
+		let revertedProject = await response.json();
+
+		// Check that a new version was created
+		expect(revertedProject.version.id).not.toEqual(initialVersionId);
+		expect(revertedProject.version.id).not.toEqual(updatedProject.version.id);
+
+		// Verify the content of the new version
+		response = await SELF.fetch(`http://api.localtest.me/v0/raw/${revertedProject.pages[0].hash}`)
+		expect(response.status).toBe(200);
+		expect(await response.text()).toEqual("reverted content");
+
+		// Verify that the project's live version has been updated
+		response = await SELF.fetch("http://api.localtest.me/v0/projects/version-update-test")
+		expect(response.status).toBe(200);
+		let currentProject = await response.json();
+		expect(currentProject.project.live_version_id).toEqual(revertedProject.version.id);
+
+		// ensure "other" page doesn't exist on live version, page is reverted
+		response = await SELF.fetch(`http://version-update-test.localtest.me/other`)
+		expect(response.status).toBe(404);
+
+		// ensure "other" page exists on reverted version
+		response = await SELF.fetch(`http://version-update-test.localtest.me/page`)
+		expect(response.status).toBe(200);
+		expect(await response.text()).toEqual("reverted content");
+	});
 });

@@ -34,7 +34,7 @@
 
                     const tdEdit = document.createElement('td');
                     const aEdit = document.createElement('a');
-                    aEdit.href = `/edit?project=${project.name}`;
+                    aEdit.href = `/edit?project=${project.name}&version=${project.live_version_id}`;
                     aEdit.textContent = 'Edit';
                     tdEdit.appendChild(aEdit);
                     tr.appendChild(tdEdit);

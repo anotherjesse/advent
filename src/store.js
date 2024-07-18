@@ -110,8 +110,8 @@ class ProjectStore {
     return content.text();
   }
 
-  async updateProject(projectName, changed_pages) {
-    const { project, version, pages } = await this.getProject(projectName);
+  async updateProject(projectName, changed_pages, versionId = null) {
+    const { project, version, pages } = await this.getProject(projectName, versionId);
 
     let newPages = [...pages];
 
@@ -125,17 +125,17 @@ class ProjectStore {
       } else {
         const hash = await hashContent(content);
         if (existingPageIndex !== -1) {
-          newPages[existingPageIndex] = { 
-            ...newPages[existingPageIndex], 
+          newPages[existingPageIndex] = {
+            ...newPages[existingPageIndex],
             hash,
-            metadata: metadata || newPages[existingPageIndex].metadata,  // Update metadata
+            metadata: metadata || newPages[existingPageIndex].metadata,
           };
         } else {
           newPages.push({
             id: crypto.randomUUID(),
             name,
             hash,
-            metadata: metadata || {},  // Add metadata for new pages
+            metadata: metadata || {},
           });
         }
         await this.r2Bucket.put(hash, content);
@@ -148,6 +148,7 @@ class ProjectStore {
       "INSERT INTO versions (id, project_name, parent_id, pages) VALUES (?, ?, ?, ?)"
     ).bind(newVersionId, project.name, version.id, JSON.stringify(newPages)).run();
 
+    // new version always becomes the live version
     await this.db.prepare(
       "UPDATE projects SET live_version_id = ? WHERE name = ?"
     ).bind(newVersionId, project.name).run();

@@ -78,16 +78,16 @@ router
 			return error(404, 'Project not found');
 		}
 	})
-	.patch('/v0/projects/:project_name', async (request, env) => {
-		const { project_name } = request.params;
+	.patch('/v0/projects/:project_name/:version_id?', async (request, env) => {
+		const { project_name, version_id } = request.params;
 		const changed_pages = await request.json();
 		// Ensure changed pages have metadata field if provided
 		const updatedPages = changed_pages.map(page => ({
 			...page,
 			metadata: page.metadata !== undefined ? page.metadata : {},
 		}));
-		const p = await env.store.updateProject(project_name, updatedPages);
-		env.linkify(p)
+		const p = await env.store.updateProject(project_name, updatedPages, version_id);
+		env.linkify(p.project)
 		return json(p)
 	})
 	.post("/v0/projects/:project_name/pages/:page_name/generate", async (request, env) => {
